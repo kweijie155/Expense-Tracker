@@ -1,0 +1,297 @@
+/**
+ * Pocket Ledger: Google Sheets sync
+ *
+ * Set up once, on a computer:
+ *   1. In this Google Sheet, choose Extensions > Apps Script.
+ *   2. Delete the code that's there, paste this whole file, then click Save.
+ *   3. Choose Deploy > New deployment. Click the gear next to "Select type" and pick Web app.
+ *      Execute as: Me. Who has access: Anyone. Click Deploy.
+ *   4. Allow access when Google asks. Google warns that it hasn't verified the app, because you made it
+ *      yourself: click Advanced, then Go to (the project name), then Allow.
+ *   5. Copy the Web app URL (it ends in /exec) into Pocket Ledger: Settings > Google Sheets.
+ *
+ * What it does: your phone sends a full copy of your ledger a few seconds after each change. This script
+ * rewrites the Entries, Bills and Summary tabs from it, and keeps the copy in a hidden tab so a new phone
+ * can restore everything. It can only see this one spreadsheet.
+ *
+ * Only the phone that connects first is accepted. To move to a new phone, open this sheet and choose
+ * Pocket Ledger > Link a new phone, then connect from the new phone.
+ *
+ * Updating this script later: Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
+ * That keeps the same web app URL. A new deployment would get a new URL.
+ *
+ * @OnlyCurrentDoc
+ */
+
+// Category ids from the app, their names, and the app's chart colours.
+var CATS = [
+  ['food', 'Food', '#d95926'],
+  ['groceries', 'Groceries', '#008300'],
+  ['transport', 'Transport', '#3987e5'],
+  ['shopping', 'Shopping', '#d55181'],
+  ['health', 'Health & care', '#199e70'],
+  ['leisure', 'Leisure', '#9085e9'],
+  ['other', 'Other', '#898781'],
+  ['bills', 'Bills', '#c98500'],
+];
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+var BACKUP_TAB = '_pocket_ledger_backup';
+var CHUNK = 45000; // a cell holds 50,000 characters
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(25000);
+  } catch (err) {
+    return reply({ ok: false, error: 'busy' });
+  }
+  try {
+    var req;
+    try {
+      req = JSON.parse((e && e.postData && e.postData.contents) || '');
+    } catch (err) {
+      return reply({ ok: false, error: 'bad-request' });
+    }
+    if (!req || typeof req.code !== 'string' || req.code.length < 20 || req.code.length > 200) return reply({ ok: false, error: 'bad-request' });
+    var props = PropertiesService.getScriptProperties();
+    var linked = props.getProperty('phoneCode');
+    if (linked && linked !== req.code) return reply({ ok: false, error: 'other-device' });
+    if (!linked) props.setProperty('phoneCode', req.code);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (req.action === 'hello') return reply({ ok: true, sheet: ss.getName(), url: ss.getUrl(), stored: storedInfo(ss) });
+    if (req.action === 'pull') return reply({ ok: true, backup: readBackup(ss) });
+    if (req.action === 'push') return reply(push(ss, req.backup, req.force === true));
+    return reply({ ok: false, error: 'bad-request' });
+  } catch (err) {
+    return reply({ ok: false, error: 'script-error', detail: String((err && err.message) || err).slice(0, 300) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Opening the web app address in a browser just confirms it's running.
+function doGet() {
+  return ContentService.createTextOutput("Pocket Ledger sync is set up. Paste this page's address into Pocket Ledger: Settings > Google Sheets.");
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Pocket Ledger').addItem('Link a new phone', 'linkNewPhone').addToUi();
+}
+
+function linkNewPhone() {
+  PropertiesService.getScriptProperties().deleteProperty('phoneCode');
+  SpreadsheetApp.getUi().alert('Done. Connect from Pocket Ledger on the new phone now: the next phone to connect is the one this sheet accepts.');
+}
+
+function reply(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function push(ss, backup, force) {
+  if (!backup || backup.app !== 'pocket-ledger' || backup.kind !== 'backup' || !Array.isArray(backup.expenses) || !Array.isArray(backup.bills)) {
+    return { ok: false, error: 'bad-request' };
+  }
+  var stored = storedInfo(ss);
+  // An empty phone (a reinstall, or cleared storage) never wipes a sheet that has entries.
+  if (!force && !backup.expenses.length && !backup.bills.length && (stored.entries > 0 || stored.bills > 0)) {
+    return { ok: false, error: 'would-erase', stored: stored };
+  }
+  var syncedAt = new Date();
+  // The hidden copy first: if anything below fails, a restore still has everything.
+  writeBackup(ss, backup, syncedAt);
+  writeEntries(ss, backup);
+  writeBills(ss, backup);
+  writeSummary(ss, backup, syncedAt);
+  return { ok: true, sheet: ss.getName(), entries: backup.expenses.length, syncedAt: syncedAt.toISOString() };
+}
+
+/* ---------- Tabs ---------- */
+
+function tab(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  // A new spreadsheet's empty first tab becomes Entries.
+  if (name === 'Entries') {
+    var others = ss.getSheets().filter(function (s) { return s.getName() !== BACKUP_TAB; });
+    if (others.length === 1 && others[0].getLastRow() === 0) return others[0].setName('Entries');
+  }
+  return ss.insertSheet(name);
+}
+
+function catName(id) {
+  for (var i = 0; i < CATS.length; i++) if (CATS[i][0] === id) return CATS[i][1];
+  return 'Other';
+}
+
+// Text that starts like a formula stays text.
+function text(s) {
+  s = String(s == null ? '' : s);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+// Noon, so the date shows the same day whatever the sheet's time zone.
+function day(iso) {
+  var p = String(iso).split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12);
+}
+
+function money(cents) {
+  return Math.round(Number(cents) || 0) / 100;
+}
+
+function monthStart(key) {
+  var p = String(key).split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, 1, 12);
+}
+
+function writeEntries(ss, backup) {
+  var sh = tab(ss, 'Entries');
+  var billName = {};
+  backup.bills.forEach(function (b) { billName[b.id] = b.name; });
+  var rows = backup.expenses.slice().sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return (Number(b.created) || 0) - (Number(a.created) || 0);
+  }).map(function (e) {
+    return [day(e.date), text(e.note), catName(e.cat), e.cat === 'bills' ? 'Bill' : 'Everyday', money(e.cents), backup.currency || 'SGD', text(billName[e.billId] || ''), String(e.id || '')];
+  });
+  sh.clearContents();
+  sh.getRange(1, 1, 1, 8).setValues([['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Recurring bill', 'Entry ID']]).setFontWeight('bold');
+  if (rows.length) {
+    sh.getRange(2, 1, rows.length, 8).setValues(rows);
+    sh.getRange(2, 1, rows.length, 1).setNumberFormat('d mmm yyyy');
+    sh.getRange(2, 5, rows.length, 1).setNumberFormat('#,##0.00');
+  }
+  sh.setFrozenRows(1);
+}
+
+function writeBills(ss, backup) {
+  var sh = tab(ss, 'Bills');
+  var lastPaid = {};
+  backup.expenses.forEach(function (e) {
+    if (e.billId && (!lastPaid[e.billId] || e.date > lastPaid[e.billId])) lastPaid[e.billId] = e.date;
+  });
+  var rows = backup.bills.map(function (b) {
+    var repeats = b.freq === 'yearly' && b.month ? 'Yearly in ' + MONTHS[b.month - 1] : 'Monthly';
+    return [text(b.name), money(b.cents), b.day, repeats, lastPaid[b.id] ? day(lastPaid[b.id]) : ''];
+  });
+  sh.clearContents();
+  sh.getRange(1, 1, 1, 5).setValues([['Bill', 'Amount', 'Due day', 'Repeats', 'Last paid']]).setFontWeight('bold');
+  if (rows.length) {
+    sh.getRange(2, 1, rows.length, 5).setValues(rows);
+    sh.getRange(2, 2, rows.length, 1).setNumberFormat('#,##0.00');
+    sh.getRange(2, 5, rows.length, 1).setNumberFormat('d mmm yyyy');
+  }
+  sh.setFrozenRows(1);
+}
+
+function writeSummary(ss, backup, syncedAt) {
+  var sh = tab(ss, 'Summary');
+  var now = /^\d{4}-\d{2}/.test(String(backup.exported || '')) ? String(backup.exported).slice(0, 7) : Utilities.formatDate(syncedAt, ss.getSpreadsheetTimeZone(), 'yyyy-MM');
+  var byMonth = {};
+  backup.expenses.forEach(function (e) {
+    var m = String(e.date).slice(0, 7);
+    var row = byMonth[m] || (byMonth[m] = {});
+    row[e.cat] = (row[e.cat] || 0) + (Number(e.cents) || 0);
+  });
+  var thisMonth = byMonth[now] || {};
+  var monthTotal = 0;
+  CATS.forEach(function (c) { monthTotal += thisMonth[c[0]] || 0; });
+
+  sh.clearContents();
+  sh.getRange(1, 1).setValue('Pocket Ledger').setFontWeight('bold').setFontSize(14);
+  sh.getRange(2, 1, 1, 2).setValues([['Last synced', syncedAt]]);
+  sh.getRange(2, 2).setNumberFormat('d mmm yyyy, h:mm am/pm');
+
+  // This month by category, in a fixed order so each colour always means the same category.
+  var p = now.split('-');
+  sh.getRange(4, 1, 1, 3).setValues([['This month (' + MONTHS[Number(p[1]) - 1].slice(0, 3) + ' ' + p[0] + ')', 'Amount', 'Share']]).setFontWeight('bold');
+  var monthRows = CATS.map(function (c) {
+    var cents = thisMonth[c[0]] || 0;
+    return [c[1], money(cents), monthTotal ? cents / monthTotal : 0];
+  });
+  sh.getRange(5, 1, CATS.length, 3).setValues(monthRows);
+  sh.getRange(5 + CATS.length, 1, 1, 3).setValues([['Total', money(monthTotal), monthTotal ? 1 : 0]]).setFontWeight('bold');
+  sh.getRange(5, 2, CATS.length + 1, 1).setNumberFormat('#,##0.00');
+  sh.getRange(5, 3, CATS.length + 1, 1).setNumberFormat('0%');
+
+  // Every month, newest first.
+  var everyday = CATS.filter(function (c) { return c[0] !== 'bills'; });
+  var head = ['Month'].concat(everyday.map(function (c) { return c[1]; }), ['Everyday', 'Bills', 'Total']);
+  var top = CATS.length + 8;
+  var rows = Object.keys(byMonth).sort().reverse().map(function (m) {
+    var r = byMonth[m];
+    var flex = 0;
+    var cells = everyday.map(function (c) {
+      flex += r[c[0]] || 0;
+      return money(r[c[0]] || 0);
+    });
+    var bills = r.bills || 0;
+    return [monthStart(m)].concat(cells, [money(flex), money(bills), money(flex + bills)]);
+  });
+  sh.getRange(top, 1).setValue('By month').setFontWeight('bold');
+  sh.getRange(top + 1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+  if (rows.length) {
+    sh.getRange(top + 2, 1, rows.length, head.length).setValues(rows);
+    sh.getRange(top + 2, 1, rows.length, 1).setNumberFormat('mmm yyyy');
+    sh.getRange(top + 2, 2, rows.length, head.length - 1).setNumberFormat('#,##0.00');
+  }
+
+  // A donut of this month, in the app's colours. Made once; it follows the numbers above on every sync.
+  if (!sh.getCharts().length) {
+    var slices = {};
+    CATS.forEach(function (c, i) { slices[i] = { color: c[2] }; });
+    sh.insertChart(sh.newChart()
+      .setChartType(Charts.ChartType.PIE)
+      .addRange(sh.getRange(5, 1, CATS.length, 2))
+      .setPosition(4, 5, 0, 0)
+      .setOption('title', 'This month by category')
+      .setOption('pieHole', 0.55)
+      .setOption('slices', slices)
+      .setOption('legend', { position: 'right' })
+      .build());
+  }
+}
+
+/* ---------- The hidden copy a new phone restores from ---------- */
+
+function writeBackup(ss, backup, syncedAt) {
+  var sh = ss.getSheetByName(BACKUP_TAB) || ss.insertSheet(BACKUP_TAB);
+  var json = JSON.stringify(backup);
+  var parts = [];
+  var i = 0;
+  while (i < json.length) {
+    var end = Math.min(i + CHUNK, json.length);
+    var code = json.charCodeAt(end - 1);
+    if (end < json.length && code >= 0xd800 && code <= 0xdbff) end -= 1; // never split an emoji in two
+    parts.push(['PL|' + json.slice(i, end)]);
+    i = end;
+  }
+  var meta = { entries: backup.expenses.length, bills: backup.bills.length, syncedAt: syncedAt.toISOString(), parts: parts.length };
+  sh.clearContents();
+  sh.getRange(1, 1).setValue('PL-META|' + JSON.stringify(meta));
+  if (parts.length) sh.getRange(2, 1, parts.length, 1).setValues(parts);
+  if (!sh.isSheetHidden()) sh.hideSheet();
+}
+
+function storedMeta(ss) {
+  var sh = ss.getSheetByName(BACKUP_TAB);
+  var head = sh ? String(sh.getRange(1, 1).getValue()) : '';
+  if (head.indexOf('PL-META|') !== 0) return null;
+  try {
+    return JSON.parse(head.slice(8));
+  } catch (err) {
+    return null;
+  }
+}
+
+function storedInfo(ss) {
+  var m = storedMeta(ss);
+  return m ? { entries: m.entries || 0, bills: m.bills || 0, syncedAt: m.syncedAt || null } : { entries: 0, bills: 0, syncedAt: null };
+}
+
+function readBackup(ss) {
+  var m = storedMeta(ss);
+  if (!m || !m.parts) return null;
+  var vals = ss.getSheetByName(BACKUP_TAB).getRange(2, 1, m.parts, 1).getValues();
+  return JSON.parse(vals.map(function (r) { return String(r[0]).replace(/^PL\|/, ''); }).join(''));
+}
