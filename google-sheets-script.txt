@@ -1,27 +1,25 @@
-/**
- * Pocket Ledger: Google Sheets sync
- *
- * Set up once, on a computer:
- *   1. In this Google Sheet, choose Extensions > Apps Script.
- *   2. Delete the code that's there, paste this whole file, then click Save.
- *   3. Choose Deploy > New deployment. Click the gear next to "Select type" and pick Web app.
- *      Execute as: Me. Who has access: Anyone. Click Deploy.
- *   4. Allow access when Google asks. Google warns that it hasn't verified the app, because you made it
- *      yourself: click Advanced, then Go to (the project name), then Allow.
- *   5. Copy the Web app URL (it ends in /exec) into Pocket Ledger: Settings > Google Sheets.
- *
- * What it does: your phone sends a full copy of your ledger a few seconds after each change. This script
- * rewrites the Entries, Bills and Summary tabs from it, and keeps the copy in a hidden tab so a new phone
- * can restore everything. It can only see this one spreadsheet.
- *
- * Only the phone that connects first is accepted. To move to a new phone, open this sheet and choose
- * Pocket Ledger > Link a new phone, then connect from the new phone.
- *
- * Updating this script later: Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
- * That keeps the same web app URL. A new deployment would get a new URL.
- *
- * @OnlyCurrentDoc
- */
+// Pocket Ledger: Google Sheets sync
+//
+// Set up once, on a computer:
+//   1. In this Google Sheet, choose Extensions > Apps Script.
+//   2. Delete the code that's there, paste this whole file, then click Save.
+//   3. Choose Deploy > New deployment. Click the gear next to "Select type" and pick Web app.
+//      Execute as: Me. Who has access: Anyone. Click Deploy.
+//   4. Allow access when Google asks. Google warns that it hasn't verified the app, because you made it
+//      yourself: click Advanced, then Go to (the project name), then Allow.
+//   5. Copy the Web app URL (it ends in /exec) into Pocket Ledger: Settings > Google Sheets.
+//
+// What it does: your phone sends a full copy of your ledger a few seconds after each change. This script
+// rewrites the Entries, Bills and Summary tabs from it, and keeps the copy in a hidden tab so a new phone
+// can restore everything. It can only see this one spreadsheet.
+//
+// Only the phone that connects first is accepted. To move to a new phone, open this sheet and choose
+// Pocket Ledger > Link a new phone, then connect from the new phone.
+//
+// Updating this script later: Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
+// That keeps the same web app URL. A new deployment would get a new URL.
+//
+/** @OnlyCurrentDoc */
 
 // Category ids from the app, their names, and the app's chart colours.
 var CATS = [
