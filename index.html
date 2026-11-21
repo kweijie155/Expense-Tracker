@@ -1081,19 +1081,25 @@
     ['shopping', 'Shopping'],
     ['health', 'Health & care'],
     ['leisure', 'Leisure'],
+    ['travel', 'Travel'],
+    ['family', 'Family'],
+    ['gifts', 'Gifts'],
     ['other', 'Other'],
   ];
   const CAT_LABEL = Object.fromEntries(CATEGORIES);
   // Words that name a category: for #tags and the Category column of an imported file.
   const CAT_ALIASES = {
-    fun: 'leisure', entertainment: 'leisure', travel: 'leisure', holiday: 'leisure', hobbies: 'leisure', nightlife: 'leisure', alcohol: 'leisure', bars: 'leisure',
+    fun: 'leisure', entertainment: 'leisure', hobbies: 'leisure', nightlife: 'leisure', alcohol: 'leisure', bars: 'leisure',
     dining: 'food', eat: 'food', drinks: 'food', restaurant: 'food', restaurants: 'food', coffee: 'food', cafe: 'food',
     sub: 'bills', subs: 'bills', subscription: 'bills', subscriptions: 'bills', utilities: 'bills', housing: 'bills', rent: 'bills', insurance: 'bills', education: 'bills', fees: 'bills', telco: 'bills', phone: 'bills', internet: 'bills', tax: 'bills', taxes: 'bills',
     med: 'health', medical: 'health', personal: 'health', care: 'health', beauty: 'health', fitness: 'health', wellness: 'health',
-    clothes: 'shopping', gift: 'shopping', gifts: 'shopping', home: 'shopping',
+    clothes: 'shopping', home: 'shopping',
+    holiday: 'travel', holidays: 'travel', trip: 'travel', trips: 'travel', vacation: 'travel', flights: 'travel', hotels: 'travel',
+    gift: 'gifts', present: 'gifts', presents: 'gifts', donations: 'gifts', charity: 'gifts',
+    parents: 'family', kids: 'family', children: 'family', childcare: 'family',
     taxi: 'transport', auto: 'transport', car: 'transport', fuel: 'transport', commute: 'transport', transportation: 'transport',
     supermarket: 'groceries', household: 'groceries',
-    misc: 'other', uncategorized: 'other', uncategorised: 'other', charity: 'other', pets: 'other',
+    misc: 'other', uncategorized: 'other', uncategorised: 'other', pets: 'other',
   };
 
   // Display currency: [symbol, decimals shown]. Amounts are always stored in hundredths.
@@ -1229,7 +1235,7 @@
     shopping: `shopping shop uniqlo zara h&m cottonon muji daiso ikea courts harveynorman bestdenki challenger
       gaincity samsung sony lazada shopee amazon taobao qoo10 zalora temu shein aliexpress kinokuniya decathlon
       lovebonito charles&keith m&s pedro bata nike adidas puma clothes clothing shirt shirts tshirt pants jeans
-      dress shoes sneakers bag wallet jewellery jewelry gift gifts present toys toy lego electronics gadget
+      dress shoes sneakers bag wallet jewellery jewelry toys toy lego electronics gadget
       laptop charger cable headphones earphones powerbank furniture homeware decor chair sofa table mattress
       pillow bedsheet stationery books book magazine`,
     health: `health clinic gp polyclinic hospital specialist a&e medical dental dentist orthodontist braces physio
@@ -1241,11 +1247,16 @@
     leisure: `leisure movie movies cinema film gv shaw cathay concert gig show theatre theater musical museum
       gallery exhibition zoo aquarium sentosa uss bowling karaoke ktv teoheng bar pub club clubbing beer beers
       heineken carlsberg guinness wine cocktail cocktails whisky soju games game gaming steam playstation psn
-      nintendo xbox travel trip hotel hostel airbnb resort holiday vacation staycation flight flights airline
-      airfare scoot jetstar airasia klook agoda expedia tour tours tickets ticket golf climbing bouldering arcade
+      nintendo xbox staycation klook tickets ticket golf climbing bouldering arcade
       timezone hobby hobbies camping diving ski festival party`,
-    other: `other others misc miscellaneous angbao angpao angpow hongbao redpacket donation donations charity
-      zakat church tithe offering temple pet pets vet petfood laundry drycleaning postage singpost courier
+    travel: `travel trip trips hotel hotels hostel airbnb resort holiday holidays vacation flight flights airline
+      airfare airport scoot jetstar airasia sia changi agoda expedia tour tours passport luggage
+      suitcase overseas abroad`,
+    family: `family parents parent mum mom mummy mommy mother dad daddy father grandma grandpa grandparents ahma
+      ahgong popo gonggong inlaws allowance`,
+    gifts: `gift gifts present presents angbao angpao angpow hongbao redpacket flowers florist bouquet hamper
+      donation donations charity zakat tithe offering`,
+    other: `other others misc miscellaneous church temple pet pets vet petfood laundry drycleaning postage singpost courier
       ninjavan printing photocopy fine fines penalty summons`,
   };
   // Names longer than one word. They are checked before single words, so "grab food" wins over "grab".
@@ -1269,13 +1280,16 @@
       ntuc income|pacific light|tuas power|keppel electric|helper salary|maid levy|aircon servicing|
       house cleaning`,
     shopping: `charles & keith|love bonito|cotton on|harvey norman|best denki|gain city|apple store|
-      gift card|tiktok shop|new balance|h & m|marks & spencer|phone case|new phone|phone repair|power bank|
+      tiktok shop|new balance|h & m|marks & spencer|phone case|new phone|phone repair|power bank|
       water bottle|school supplies`,
     health: `a & e|eye check|eye test|contact lenses|contact lens|hair cut|gym membership|health screening|
       thai massage|foot massage|dental cleaning|medical check`,
-    leisure: `golden village|universal studios|bird park|river wonders|night safari|escape room|trip com|
-      booking com|gardens by the bay|theme park|water park|teo heng|cable car`,
-    other: `ang bao|ang pao|ang pow|red packet|hong bao|pet food|dry cleaning`,
+    leisure: `golden village|universal studios|bird park|river wonders|night safari|escape room|
+      gardens by the bay|theme park|water park|teo heng|cable car`,
+    travel: `trip com|booking com|singapore airlines|travel insurance|airport transfer|hotel booking`,
+    family: `parents allowance|allowance for parents|pocket money|family support|in laws`,
+    gifts: `gift card|birthday gift|birthday present|wedding gift|ang bao|ang pao|ang pow|red packet|hong bao`,
+    other: `pet food|dry cleaning`,
   };
   // Shops that sell everything, and words that only hint. A more specific word in the same description wins.
   const WEAK = new Set(
@@ -2657,7 +2671,7 @@
 
   // Category colours: the validated reference palette (dark steps), fixed per category so a colour always
   // means the same thing. Grey is for Other.
-  const CAT_COLOR = { food: '#d95926', groceries: '#008300', transport: '#3987e5', shopping: '#d55181', health: '#199e70', leisure: '#9085e9', other: '#898781', bills: '#c98500' };
+  const CAT_COLOR = { food: '#d95926', groceries: '#008300', transport: '#3987e5', shopping: '#d55181', health: '#199e70', leisure: '#9085e9', travel: '#0094b8', family: '#9a6b3f', gifts: '#d1343b', other: '#898781', bills: '#c98500' };
   const catName = (cat) => CAT_LABEL[cat] || 'Other';
   const shareText = (s) => (s > 0 && s < 0.005 ? '<1%' : `${Math.round(s * 100)}%`);
   // White or near-black, whichever reads better on the fill.
@@ -4342,6 +4356,9 @@ var CATS = [
   ['shopping', 'Shopping', '#d55181'],
   ['health', 'Health & care', '#199e70'],
   ['leisure', 'Leisure', '#9085e9'],
+  ['travel', 'Travel', '#0094b8'],
+  ['family', 'Family', '#9a6b3f'],
+  ['gifts', 'Gifts', '#d1343b'],
   ['other', 'Other', '#898781'],
   ['bills', 'Bills', '#c98500'],
 ];

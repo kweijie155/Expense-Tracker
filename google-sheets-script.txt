@@ -31,6 +31,9 @@ var CATS = [
   ['shopping', 'Shopping', '#d55181'],
   ['health', 'Health & care', '#199e70'],
   ['leisure', 'Leisure', '#9085e9'],
+  ['travel', 'Travel', '#0094b8'],
+  ['family', 'Family', '#9a6b3f'],
+  ['gifts', 'Gifts', '#d1343b'],
   ['other', 'Other', '#898781'],
   ['bills', 'Bills', '#c98500'],
 ];
