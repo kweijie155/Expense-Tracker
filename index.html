@@ -11,7 +11,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ledger">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="pocket-ledger-version" content="pocket-ledger-limits-2026-11-21">
+<meta name="pocket-ledger-version" content="pocket-ledger-lock-2026-11-21">
+<script>
+  // App lock: hide the ledger before anything paints when a PIN is set. The main script shows the keypad.
+  try { if (localStorage.getItem('pocket-ledger:lock')) document.documentElement.classList.add('is-locked'); } catch (err) {}
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -708,6 +712,77 @@
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }
   }
+  /* App lock: a full-screen keypad that covers the ledger until the PIN is entered. */
+  html.is-locked .shell, html.is-locked #sheet, html.is-locked #toast { visibility: hidden; }
+  .lock {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    justify-content: center;
+    overflow-y: auto;
+    background: var(--bg);
+    padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    animation: lock-in 0.2s ease-out;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .lock::before { content: ""; position: absolute; inset: 0 0 auto; height: 520px; pointer-events: none; background: radial-gradient(80% 60% at 50% -10%, var(--gold-soft), transparent 70%); }
+  .lock.is-leaving { animation: lock-out 0.24s ease-in forwards; }
+  .lock-inner { position: relative; width: 100%; max-width: 340px; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+  .lock-inner:focus { outline: none; }
+  .lock-top { position: absolute; top: 4px; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+  .lock-head { display: grid; justify-items: center; gap: 10px; text-align: center; margin-top: 36px; }
+  .lock-icon { display: grid; place-items: center; width: 58px; height: 58px; margin-bottom: 6px; border-radius: 50%; border: 1px solid var(--gold-line); background: var(--gold-soft); color: var(--gold); }
+  .lock-title { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); }
+  .lock-msg { min-height: 21px; max-width: 300px; font-size: 14px; color: var(--muted); }
+  .lock-msg.is-error { color: var(--alert); }
+  .lock-dots { display: flex; gap: 20px; padding: 6px 0; }
+  .lock-dots i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--ink-2); transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease; }
+  .lock-dots i.is-on { background: var(--gold); border-color: var(--gold); transform: scale(1.1); box-shadow: 0 0 14px var(--gold-line); }
+  .lock-dots.is-error i { background: var(--alert); border-color: var(--alert); box-shadow: none; }
+  .lock-dots.is-ok i { background: var(--good); border-color: var(--good); box-shadow: 0 0 14px var(--glow-good); }
+  .lock-dots.is-shake { animation: lock-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+  .lock-pad { --key: 76px; display: grid; grid-template-columns: repeat(3, var(--key)); gap: 16px 26px; justify-content: center; }
+  .lock-key {
+    display: grid;
+    place-items: center;
+    width: var(--key);
+    height: var(--key);
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font-size: 28px;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    touch-action: manipulation;
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.08s ease, opacity 0.15s ease;
+  }
+  .lock-key:active, .lock-key.is-press { background: var(--gold-soft); border-color: var(--gold-line); transform: scale(0.95); }
+  .lock-key.is-text { border-color: transparent; background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 600; }
+  .lock-key.is-text:active { background: var(--card-2); }
+  .lock-key:disabled { opacity: 0.32; transform: none; }
+  .lock-key.is-blank { visibility: hidden; }
+  .lock-forgot { display: grid; gap: 14px; width: 100%; text-align: center; }
+  .lock-forgot p { font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+  .lock-forgot .btn { width: 100%; }
+  .lock-meter { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+  .lock-meter span { display: block; width: var(--w, 0%); height: 100%; border-radius: inherit; background: var(--gold); transition: width 1s linear; }
+  @media (max-height: 680px) {
+    .lock-pad { --key: 66px; gap: 12px 24px; }
+    .lock-icon { display: none; }
+    .lock-inner { gap: 22px; }
+  }
+  @keyframes lock-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes lock-out { from { opacity: 1; } to { opacity: 0; transform: scale(1.03); } }
+  @keyframes lock-shake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-9px); }
+    40%, 60% { transform: translateX(9px); }
+  }
+  .lock-state { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -1071,6 +1146,26 @@
         <div class="data-actions"><button id="sSync" type="button" class="btn btn-ghost">Set up sync</button></div>
         <p id="sSyncStatus" class="field-hint"></p>
       </div>
+      <div id="sLockWrap">
+        <div class="lock-state">
+          <p class="field-label" style="margin: 0">App lock</p>
+          <span id="sLockState" class="status lv-none"><i></i><span>Off</span></span>
+        </div>
+        <div class="data-actions">
+          <button id="sLockSet" type="button" class="btn btn-ghost">Set a 4-digit PIN</button>
+          <button id="sLockChange" type="button" class="btn btn-ghost" hidden>Change PIN</button>
+          <button id="sLockOff" type="button" class="btn btn-ghost" hidden>Turn off</button>
+        </div>
+        <fieldset id="sLockAfterWrap" class="min-w-0" style="margin-top: 14px" hidden>
+          <legend class="field-label">Ask again after leaving the app</legend>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="sLockAfter" value="0"><span>Right away</span></label>
+            <label class="chip"><input type="radio" name="sLockAfter" value="60"><span>After 1 minute</span></label>
+            <label class="chip"><input type="radio" name="sLockAfter" value="300"><span>After 5 minutes</span></label>
+          </div>
+        </fieldset>
+        <p id="sLockHint" class="field-hint">Asks for a PIN when you open the app and when you come back to it. It keeps other people from looking through this phone, but it doesn't encrypt your data. The PIN stays on this phone only: it isn't in backups or your Google Sheet.</p>
+      </div>
       <div class="danger-zone">
         <button id="sClear" type="button" class="btn btn-quiet">Clear examples</button>
       </div>
@@ -1120,6 +1215,48 @@
         <div class="danger-zone"><button id="gOff" type="button" class="btn btn-quiet">Disconnect</button></div>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="lock" class="lock" role="dialog" aria-modal="true" aria-labelledby="lockTitle" hidden>
+  <div id="lockInner" class="lock-inner" tabindex="-1">
+    <div class="lock-top">
+      <p class="brand"><span class="mark" aria-hidden="true"></span>Pocket Ledger</p>
+      <button id="lockCancel" type="button" class="link-btn" hidden>Cancel</button>
+    </div>
+    <div class="lock-head">
+      <div class="lock-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="9.5" width="14" height="10" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 9.5V7a3.5 3.5 0 0 1 7 0v2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="11" cy="14.5" r="1.4" fill="currentColor"/></svg>
+      </div>
+      <h2 id="lockTitle" class="lock-title">Enter your PIN</h2>
+      <p id="lockMsg" class="lock-msg" aria-live="polite"></p>
+    </div>
+    <div id="lockEntry" style="display: contents">
+      <div id="lockDots" class="lock-dots" role="img" aria-label="0 of 4 digits entered"><i></i><i></i><i></i><i></i></div>
+      <div id="lockPad" class="lock-pad">
+        <button type="button" class="lock-key" data-digit="1">1</button>
+        <button type="button" class="lock-key" data-digit="2">2</button>
+        <button type="button" class="lock-key" data-digit="3">3</button>
+        <button type="button" class="lock-key" data-digit="4">4</button>
+        <button type="button" class="lock-key" data-digit="5">5</button>
+        <button type="button" class="lock-key" data-digit="6">6</button>
+        <button type="button" class="lock-key" data-digit="7">7</button>
+        <button type="button" class="lock-key" data-digit="8">8</button>
+        <button type="button" class="lock-key" data-digit="9">9</button>
+        <button id="lockForgotBtn" type="button" class="lock-key is-text">Forgot?</button>
+        <button type="button" class="lock-key" data-digit="0">0</button>
+        <button id="lockDel" type="button" class="lock-key is-text" aria-label="Delete last digit">
+          <svg width="24" height="18" viewBox="0 0 24 18" fill="none" aria-hidden="true"><path d="M8 2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-6-7 6-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 6.5l5 5M16.5 6.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="lockForgot" class="lock-forgot" hidden>
+      <p>Your entries, bills and settings are safe. Resetting removes only the PIN, nothing else.</p>
+      <p>So a reset can't be used to skip the lock in a moment, it takes 60 seconds with this screen open.</p>
+      <div id="lockMeterWrap" class="lock-meter" hidden><span id="lockMeter"></span></div>
+      <button id="lockReset" type="button" class="btn btn-primary">Start reset</button>
+      <button id="lockBack" type="button" class="btn btn-ghost">Back to keypad</button>
+    </div>
   </div>
 </div>
 
@@ -4549,6 +4686,384 @@
     cancelAnimationFrame(resizeFrame);
     resizeFrame = requestAnimationFrame(renderChart);
   });
+
+  /* ---------- App lock ---------- */
+  // A privacy lock for this phone: a 4-digit PIN in front of the ledger. Only a salted PBKDF2 hash is kept,
+  // under its own key, so it is never in backups, never synced to Google Sheets, and survives Delete all data.
+  // The ledger itself is not encrypted, so the PIN keeps out a curious glance, not a determined expert.
+  const LOCK_KEY = 'pocket-ledger:lock';
+  const LOCK_ITER = 150000;
+  const LOCK_RESET_SECS = 60;
+  const lockEls = {};
+  ['lock', 'lockInner', 'lockCancel', 'lockTitle', 'lockMsg', 'lockEntry', 'lockDots', 'lockPad', 'lockForgotBtn', 'lockDel', 'lockForgot', 'lockMeterWrap', 'lockMeter', 'lockReset', 'lockBack',
+    'sLockWrap', 'sLockState', 'sLockSet', 'sLockChange', 'sLockOff', 'sLockAfterWrap', 'sLockHint'].forEach((id) => { lockEls[id] = $(id); });
+  const canHash = Boolean(window.crypto && crypto.subtle && window.TextEncoder);
+  const lk = { rec: null, mode: null, step: 0, digits: '', first: '', busy: false, done: null, back: null, coolTimer: 0, resetTimer: 0, hiddenAt: 0, hold: 0 };
+
+  function lockLoad() {
+    const r = parseJSON(read(LOCK_KEY));
+    lk.rec = r && typeof r.hash === 'string' && typeof r.salt === 'string'
+      ? { v: 1, salt: r.salt, hash: r.hash, iter: Number(r.iter) || LOCK_ITER, after: [0, 60, 300].includes(r.after) ? r.after : 0, fails: Number(r.fails) || 0, until: Number(r.until) || 0 }
+      : null;
+  }
+  const lockStore = () => (lk.rec ? write(LOCK_KEY, JSON.stringify(lk.rec)) : (forget([LOCK_KEY]), true));
+  const toB64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function pinHash(pin, salt, iter) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    return toB64(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256));
+  }
+  async function pinMatches(pin) {
+    try {
+      return (await pinHash(pin, fromB64(lk.rec.salt), lk.rec.iter)) === lk.rec.hash;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function lockMsg(text, error = false) {
+    lockEls.lockMsg.textContent = text;
+    lockEls.lockMsg.classList.toggle('is-error', error);
+  }
+  function paintDots() {
+    [...lockEls.lockDots.children].forEach((d, i) => d.classList.toggle('is-on', i < lk.digits.length));
+    lockEls.lockDots.setAttribute('aria-label', `${lk.digits.length} of 4 digits entered`);
+  }
+  const coolLeft = () => (lk.rec && lk.rec.until > Date.now() ? Math.ceil((lk.rec.until - Date.now()) / 1000) : 0);
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  function setPadDisabled(off) {
+    for (const b of lockEls.lockPad.querySelectorAll('[data-digit], #lockDel')) b.disabled = off;
+  }
+  function paintCooldown() {
+    clearInterval(lk.coolTimer);
+    const left = coolLeft();
+    if (!left || (lk.mode !== 'unlock' && lk.mode !== 'verify')) {
+      setPadDisabled(false);
+      return false;
+    }
+    setPadDisabled(true);
+    const tick = () => {
+      const s = coolLeft();
+      if (!s) {
+        clearInterval(lk.coolTimer);
+        setPadDisabled(false);
+        lockMsg(lk.mode === 'unlock' ? 'Try again.' : 'Enter your current PIN.');
+        return;
+      }
+      lockMsg(`Too many wrong tries. Try again in ${mmss(s)}.`, true);
+    };
+    tick();
+    lk.coolTimer = setInterval(tick, 1000);
+    return true;
+  }
+
+  const TITLES = {
+    unlock: ['Enter your PIN', ''],
+    verify: ['Enter your current PIN', ''],
+    set: ['Choose a 4-digit PIN', "You'll enter it when you open Pocket Ledger."],
+    confirm: ['Enter it again', 'Just to make sure.'],
+  };
+  function setStep(key, msg) {
+    const [title, sub] = TITLES[key];
+    lockEls.lockTitle.textContent = title;
+    lockMsg(msg != null ? msg : sub, false);
+    lk.digits = '';
+    paintDots();
+  }
+
+  // mode: 'unlock' (app start or return), 'verify' (before change or turn off), 'set' (new PIN).
+  function showLock(mode, done) {
+    clearInterval(lk.resetTimer);
+    lk.mode = mode;
+    lk.done = done || null;
+    lk.step = 0;
+    lk.first = '';
+    lk.busy = false;
+    lockEls.lockDots.className = 'lock-dots';
+    lockEls.lockForgot.hidden = true;
+    lockEls.lockEntry.hidden = false;
+    lockEls.lockEntry.style.display = 'contents';
+    lockEls.lockCancel.hidden = mode === 'unlock';
+    lockEls.lockForgotBtn.classList.toggle('is-blank', mode === 'set');
+    lockEls.lockForgotBtn.tabIndex = mode === 'set' ? -1 : 0;
+    setStep(mode === 'set' ? 'set' : mode);
+    paintCooldown();
+    if (lockEls.lock.hidden) {
+      lk.back = document.activeElement;
+      lockEls.lock.classList.remove('is-leaving');
+      lockEls.lock.hidden = false;
+      for (const el of [document.querySelector('.shell'), els.sheet, els.toast]) el.inert = true;
+    }
+    if (mode === 'unlock') document.documentElement.classList.add('is-locked');
+    requestAnimationFrame(() => lockEls.lockInner.focus({ preventScroll: true }));
+  }
+  function hideLock(animate = true) {
+    clearInterval(lk.coolTimer);
+    clearInterval(lk.resetTimer);
+    lk.mode = null;
+    lk.digits = '';
+    document.documentElement.classList.remove('is-locked');
+    for (const el of [document.querySelector('.shell'), els.sheet, els.toast]) el.inert = false;
+    const finish = () => {
+      lockEls.lock.hidden = true;
+      lockEls.lock.classList.remove('is-leaving');
+    };
+    if (animate && !mqReduce.matches) {
+      lockEls.lock.classList.add('is-leaving');
+      setTimeout(finish, 230);
+    } else finish();
+    const back = lk.back;
+    lk.back = null;
+    if (back && document.contains(back) && !back.closest('.lock')) back.focus({ preventScroll: true });
+  }
+  function lockNow() {
+    if (!lk.rec || lk.mode === 'unlock') return;
+    showLock('unlock');
+  }
+
+  function wrongPin() {
+    lk.rec.fails += 1;
+    if (lk.rec.fails >= 5) lk.rec.until = Date.now() + Math.min(300, 30 * 2 ** (lk.rec.fails - 5)) * 1000;
+    lockStore();
+    if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+    const dots = lockEls.lockDots;
+    dots.classList.remove('is-shake');
+    void dots.offsetWidth;
+    dots.classList.add('is-shake', 'is-error');
+    const left = Math.max(0, 5 - lk.rec.fails);
+    lockMsg(left && left <= 2 ? `Wrong PIN. ${plural(left, 'try', 'tries')} left before a short wait.` : 'Wrong PIN. Try again.', true);
+    setTimeout(() => {
+      dots.classList.remove('is-shake', 'is-error');
+      lk.digits = '';
+      paintDots();
+      lk.busy = false;
+      paintCooldown();
+    }, 480);
+  }
+  async function submitPin() {
+    const pin = lk.digits;
+    if (lk.mode === 'unlock' || lk.mode === 'verify') {
+      lk.busy = true;
+      if (!(await pinMatches(pin))) {
+        wrongPin();
+        return;
+      }
+      lk.rec.fails = 0;
+      lk.rec.until = 0;
+      lockStore();
+      lockEls.lockDots.classList.add('is-ok');
+      if (lk.mode === 'unlock') {
+        setTimeout(() => hideLock(), 160);
+        return;
+      }
+      const next = lk.done;
+      setTimeout(() => {
+        lockEls.lockDots.classList.remove('is-ok');
+        lk.busy = false;
+        if (next) next();
+      }, 200);
+      return;
+    }
+    // Choosing a new PIN: enter it, then once more to confirm.
+    if (lk.step === 0) {
+      lk.first = pin;
+      lk.step = 1;
+      setTimeout(() => setStep('confirm'), 140);
+      return;
+    }
+    if (pin !== lk.first) {
+      if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+      lk.busy = true;
+      const dots = lockEls.lockDots;
+      dots.classList.add('is-shake', 'is-error');
+      setTimeout(() => {
+        dots.classList.remove('is-shake', 'is-error');
+        lk.busy = false;
+        lk.step = 0;
+        lk.first = '';
+        setStep('set');
+        lockMsg("Those didn't match. Choose a PIN again.", true);
+      }, 480);
+      return;
+    }
+    lk.busy = true;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    let hash = '';
+    try {
+      hash = await pinHash(pin, salt, LOCK_ITER);
+    } catch (err) {
+      lk.busy = false;
+      setStep('set', "Couldn't save the PIN on this browser.");
+      return;
+    }
+    const had = Boolean(lk.rec);
+    lk.rec = { v: 1, salt: toB64(salt), hash, iter: LOCK_ITER, after: lk.rec ? lk.rec.after : 0, fails: 0, until: 0 };
+    const ok = lockStore();
+    lockEls.lockDots.classList.add('is-ok');
+    setTimeout(() => {
+      hideLock();
+      renderLockSettings();
+      if (!ok) toast('This browser is blocking storage, so the PIN will be forgotten when the app closes.');
+      else toast(had ? 'PIN changed.' : 'App lock is on. Pocket Ledger will ask for your PIN when you open it.');
+    }, 200);
+  }
+  function padDigit(d) {
+    if (!lk.mode || lk.busy || coolLeft() || lk.digits.length >= 4 || !lockEls.lockForgot.hidden) return;
+    lk.digits += d;
+    paintDots();
+    if (lk.digits.length === 4) {
+      lk.busy = true;
+      setTimeout(() => {
+        lk.busy = false;
+        submitPin();
+      }, 120);
+    }
+  }
+  function padDelete() {
+    if (!lk.mode || lk.busy || !lk.digits) return;
+    lk.digits = lk.digits.slice(0, -1);
+    paintDots();
+  }
+  function cancelLock() {
+    if (!lk.mode || lk.mode === 'unlock') return;
+    hideLock();
+  }
+
+  // Forgot the PIN: wait out a minute with the screen open, then only the PIN is removed. No data is touched.
+  function showForgot() {
+    if (lk.mode === 'set') return;
+    if (lk.mode === 'verify') {
+      hideLock();
+      toast('Forgot your PIN? Close and reopen the app, then tap Forgot? on the lock screen.');
+      return;
+    }
+    lockEls.lockEntry.hidden = true;
+    lockEls.lockEntry.style.display = 'none';
+    lockEls.lockForgot.hidden = false;
+    lockEls.lockMeterWrap.hidden = true;
+    lockEls.lockReset.hidden = false;
+    lockEls.lockTitle.textContent = 'Forgot your PIN?';
+    lockMsg('');
+    lockEls.lockReset.focus({ preventScroll: true });
+  }
+  function backToPad() {
+    clearInterval(lk.resetTimer);
+    showLock('unlock');
+  }
+  function startReset() {
+    const end = Date.now() + LOCK_RESET_SECS * 1000;
+    lockEls.lockReset.hidden = true;
+    lockEls.lockMeterWrap.hidden = false;
+    lockEls.lockMeter.style.setProperty('--w', '0%');
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      lockEls.lockMeter.style.setProperty('--w', `${(((LOCK_RESET_SECS - left) / LOCK_RESET_SECS) * 100).toFixed(1)}%`);
+      lockMsg(left ? `Removing your PIN in ${mmss(left)}. Keep this screen open.` : '');
+      if (left) return;
+      clearInterval(lk.resetTimer);
+      lk.rec = null;
+      lockStore();
+      hideLock();
+      renderLockSettings();
+      toast('PIN removed. All your data is here. You can set a new PIN in Settings.', null, 8000);
+    };
+    tick();
+    lk.resetTimer = setInterval(tick, 1000);
+  }
+
+  function renderLockSettings() {
+    const on = Boolean(lk.rec);
+    const st = lockEls.sLockState;
+    st.className = `status ${on ? 'lv-good' : 'lv-none'}`;
+    st.lastElementChild.textContent = on ? 'On' : 'Off';
+    lockEls.sLockSet.hidden = on;
+    lockEls.sLockSet.disabled = !canHash;
+    lockEls.sLockChange.hidden = !on;
+    lockEls.sLockOff.hidden = !on;
+    lockEls.sLockAfterWrap.hidden = !on;
+    for (const r of document.querySelectorAll('input[name="sLockAfter"]')) r.checked = on && Number(r.value) === lk.rec.after;
+    if (!canHash) lockEls.sLockHint.textContent = 'App lock needs the app opened from its https address, such as the GitHub Pages link.';
+  }
+
+  lockEls.lockPad.addEventListener('click', (ev) => {
+    const key = ev.target.closest('.lock-key');
+    if (!key) return;
+    if (key.dataset.digit) padDigit(key.dataset.digit);
+    else if (key === lockEls.lockDel) padDelete();
+    else if (key === lockEls.lockForgotBtn) showForgot();
+  });
+  lockEls.lockCancel.addEventListener('click', cancelLock);
+  lockEls.lockReset.addEventListener('click', startReset);
+  lockEls.lockBack.addEventListener('click', backToPad);
+  // A typed PIN works too, on a computer or with a hardware keyboard.
+  document.addEventListener('keydown', (ev) => {
+    if (!lk.mode || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (/^[0-9]$/.test(ev.key)) {
+      ev.preventDefault();
+      const key = lockEls.lockPad.querySelector(`[data-digit="${ev.key}"]`);
+      key.classList.add('is-press');
+      setTimeout(() => key.classList.remove('is-press'), 110);
+      padDigit(ev.key);
+    } else if (ev.key === 'Backspace') {
+      ev.preventDefault();
+      padDelete();
+    } else if (ev.key === 'Escape') {
+      ev.preventDefault();
+      if (!lockEls.lockForgot.hidden) backToPad();
+      else cancelLock();
+    }
+  }, true);
+
+  lockEls.sLockSet.addEventListener('click', () => showLock('set'));
+  lockEls.sLockChange.addEventListener('click', () => showLock('verify', () => showLock('set')));
+  lockEls.sLockOff.addEventListener('click', () => showLock('verify', () => {
+    lk.rec = null;
+    lockStore();
+    hideLock();
+    renderLockSettings();
+    toast('App lock is off.');
+  }));
+  for (const r of document.querySelectorAll('input[name="sLockAfter"]')) {
+    r.addEventListener('change', () => {
+      if (!lk.rec || !r.checked) return;
+      lk.rec.after = Number(r.value);
+      lockStore();
+    });
+  }
+
+  // Lock again when the app comes back from the background. Picking a file, sharing a backup or opening
+  // the sheet leaves the app briefly on purpose, so those don't count.
+  const holdLock = () => { lk.hold = Date.now() + 120000; };
+  els.sImport.addEventListener('click', holdLock);
+  els.gOpen.addEventListener('click', holdLock);
+  for (const b of [els.sBackup, els.sExport, els.exportBtn]) b.addEventListener('click', holdLock);
+  document.addEventListener('visibilitychange', () => {
+    if (!lk.rec) return;
+    const held = lk.hold > Date.now();
+    if (document.hidden) {
+      lk.hiddenAt = Date.now();
+      // A PIN reset only counts while the screen stays open.
+      if (lk.mode === 'unlock' && !lockEls.lockForgot.hidden) backToPad();
+      // Right away: cover the screen before the phone takes its app-switcher snapshot.
+      if (!held && lk.rec.after === 0) lockNow();
+      return;
+    }
+    lk.hold = 0;
+    if (!held && lk.hiddenAt && Date.now() - lk.hiddenAt >= lk.rec.after * 1000) lockNow();
+  });
+  window.addEventListener('pageshow', (ev) => {
+    if (ev.persisted && lk.rec) lockNow();
+  });
+  window.addEventListener('storage', (ev) => {
+    if (ev.key !== LOCK_KEY && ev.key !== null) return;
+    lockLoad();
+    renderLockSettings();
+  });
+
+  lockLoad();
+  renderLockSettings();
+  if (lk.rec) showLock('unlock');
+  else document.documentElement.classList.remove('is-locked');
 
   loadState();
   state.catScope = (parseJSON(read(PREFS_KEY)) || {}).catScope === 'all' ? 'all' : 'everyday';
