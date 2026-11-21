@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ledger">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="pocket-ledger-version" content="pocket-ledger-f7f0e2f683">
+<meta name="pocket-ledger-version" content="pocket-ledger-limits-2026-11-21">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -443,6 +443,9 @@
   .cat-delta.up { color: var(--watch); }
   .cat-delta.down { color: var(--good); }
   .meter { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--track); }
+  /* A category with a monthly limit: the bar fills toward the limit and takes the status colour. */
+  .cat-row .meter.is-limit span, .cat-row[aria-pressed="true"] .meter.is-limit span { background: var(--lv); opacity: 0.9; }
+  .cat-sub .lv-watch, .cat-sub .lv-alert { color: var(--lv); font-weight: 600; }
   .meter span { display: block; width: max(4px, var(--w)); height: 100%; border-radius: 999px; background: var(--ink-2); opacity: 0.55; transition: width 0.35s ease; }
   .cat-row[aria-pressed="true"] { background: var(--gold-soft); }
   .cat-row[aria-pressed="true"] .meter span { background: var(--gold); opacity: 1; }
@@ -479,6 +482,9 @@
   .sync-status.is-warn { color: var(--watch); }
 
   /* Entries */
+  .search-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .search-row .search { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+  .search-row .chip-btn { flex: none; height: 42px; padding-inline: 14px; }
   .search { position: relative; display: block; margin-top: 12px; }
   .search svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
   .search input { width: 100%; height: 42px; padding: 0 14px 0 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink); font-size: 16px; }
@@ -648,6 +654,18 @@
   .chip input:checked + span { border-color: var(--gold); background: var(--gold-soft); color: var(--ink); }
   .chip input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
   .sheet-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .limit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 8px; }
+  .limit-field { display: grid; gap: 5px; min-width: 0; }
+  .limit-name { font-size: 13px; color: var(--ink-2); }
+  .amount.amount-sm { height: 44px; padding: 0 12px; border-radius: 12px; }
+  .amount.amount-sm input { font-size: 16px; font-weight: 400; }
+  .amount.amount-sm .amount-prefix { font-size: 13px; }
+  .limits-box > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .limits-box > summary::-webkit-details-marker { display: none; }
+  .limits-box > summary .card-meta { white-space: nowrap; }
+  .limits-box > summary::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 4px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); transition: transform 0.15s ease; }
+  .limits-box[open] > summary::after { transform: rotate(-135deg); }
+  .limits-box[open] > summary { margin-bottom: 10px; }
   .sheet-actions .btn-primary { flex: 1 1 auto; }
   .divider { height: 1px; margin-block: 4px; background: var(--line); }
   /* Two columns where the labels fit, one on phones. */
@@ -705,6 +723,26 @@
   @media (min-width: 768px) { .topbar { padding-top: calc(28px + env(safe-area-inset-top, 0px)); } }
   .shell { padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  /* Last 6 months: one column per month, everyday at the bottom and bills on top. */
+  :root { --bills-c: #c98500; }
+  .trend { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-top: 14px; --plot: 120px; --lab: 40px; }
+  .trend-col { display: grid; grid-template-rows: var(--plot) var(--lab); width: 100%; padding: 0; border-radius: 10px; text-align: center; transition: background-color 0.15s ease; }
+  .trend-col:hover { background: var(--card-2); }
+  .trend-plot { display: flex; align-items: flex-end; justify-content: center; padding-inline: 18%; }
+  .trend-stack { display: flex; flex-direction: column-reverse; width: 100%; max-width: 34px; height: var(--h); min-height: 2px; border-radius: 6px 6px 3px 3px; overflow: hidden; background: var(--track); }
+  .trend-stack i { display: block; flex: none; }
+  .trend-stack .f { height: var(--f); background: var(--ink-2); opacity: 0.6; }
+  .trend-stack .b { height: var(--b); background: var(--bills-c); }
+  .trend-col[aria-current="true"] .trend-stack .f { background: var(--gold); opacity: 1; }
+  .trend-col[aria-current="true"] .trend-mon { color: var(--ink); font-weight: 700; }
+  .trend-lab { display: grid; align-content: start; padding-top: 6px; line-height: 1.25; }
+  .trend-mon { font-size: 12px; color: var(--muted); }
+  .trend-amt { font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .trend-avg { position: absolute; left: 0; right: 0; bottom: calc(var(--lab) + var(--a) * var(--plot)); border-top: 1px dashed var(--gold-line); pointer-events: none; }
+  .trend-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .trend-legend b { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; background: var(--ink-2); opacity: 0.6; }
+  .trend-legend b.is-bills { background: var(--bills-c); opacity: 1; }
+  .trend-legend b.is-avg { height: 0; border-radius: 0; border-top: 1px dashed var(--gold); background: none; opacity: 1; vertical-align: 3px; }
   body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
@@ -865,16 +903,32 @@
         <ul id="breakdown" class="breakdown"></ul>
       </section>
 
+      <section class="card" aria-labelledby="trendTitle">
+        <div class="card-head">
+          <h2 id="trendTitle" class="card-title">Last 6 months</h2>
+          <span id="trendMeta" class="card-meta"></span>
+        </div>
+        <div id="trend" class="trend"></div>
+        <div class="trend-legend" aria-hidden="true">
+          <span><b></b>Everyday</span>
+          <span><b class="is-bills"></b>Bills</span>
+          <span id="trendLegAvg"><b class="is-avg"></b>Everyday average</span>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="ledgerTitle">
         <div class="card-head">
           <h2 id="ledgerTitle" class="card-title">Entries <span id="entryCount" class="card-meta"></span></h2>
           <button id="filterChip" type="button" class="filter-chip" hidden></button>
         </div>
-        <label class="search" for="search">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <span class="sr-only">Search entries</span>
-          <input id="search" type="search" placeholder="Search this month" autocomplete="off">
-        </label>
+        <div class="search-row">
+          <label class="search" for="search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 13.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span class="sr-only">Search entries</span>
+            <input id="search" type="search" placeholder="Search this month" autocomplete="off">
+          </label>
+          <button id="searchAll" type="button" class="chip-btn" aria-pressed="false" title="Search and list entries from every month">All months</button>
+        </div>
         <div id="exampleNote" class="example-note" hidden>
           <p>These are example entries and bills. They clear when you add your own.</p>
           <button id="clearExamples" type="button" class="link-btn">Clear examples</button>
@@ -979,6 +1033,12 @@
         <p id="sBudgetHint" class="field-hint">Food, transport, shopping and other day-to-day costs. Bills are tracked separately.</p>
         <p id="sBudgetError" class="field-error" aria-live="polite"></p>
       </div>
+      <details id="sLimitsBox" class="limits-box">
+        <summary><span class="field-label" style="margin: 0">Category limits <span class="font-normal text-muted">optional</span></span><span id="sLimitsMeta" class="card-meta"></span></summary>
+        <div id="sLimits" class="limit-grid"></div>
+        <p class="field-hint">A monthly cap for single categories, such as Food or Shopping. Leave a box blank for no cap. Each limit shows as a bar under By category, and Today's focus warns you as one gets close.</p>
+        <p id="sLimitsError" class="field-error" aria-live="polite"></p>
+      </details>
       <div>
         <label for="sIncome" class="field-label">Monthly take-home pay <span class="font-normal text-muted">optional</span></label>
         <div id="sIncomeBox" class="amount">
@@ -1081,19 +1141,25 @@
     ['shopping', 'Shopping'],
     ['health', 'Health & care'],
     ['leisure', 'Leisure'],
+    ['travel', 'Travel'],
+    ['family', 'Family'],
+    ['gifts', 'Gifts'],
     ['other', 'Other'],
   ];
   const CAT_LABEL = Object.fromEntries(CATEGORIES);
   // Words that name a category: for #tags and the Category column of an imported file.
   const CAT_ALIASES = {
-    fun: 'leisure', entertainment: 'leisure', travel: 'leisure', holiday: 'leisure', hobbies: 'leisure', nightlife: 'leisure', alcohol: 'leisure', bars: 'leisure',
+    fun: 'leisure', entertainment: 'leisure', hobbies: 'leisure', nightlife: 'leisure', alcohol: 'leisure', bars: 'leisure',
     dining: 'food', eat: 'food', drinks: 'food', restaurant: 'food', restaurants: 'food', coffee: 'food', cafe: 'food',
     sub: 'bills', subs: 'bills', subscription: 'bills', subscriptions: 'bills', utilities: 'bills', housing: 'bills', rent: 'bills', insurance: 'bills', education: 'bills', fees: 'bills', telco: 'bills', phone: 'bills', internet: 'bills', tax: 'bills', taxes: 'bills',
     med: 'health', medical: 'health', personal: 'health', care: 'health', beauty: 'health', fitness: 'health', wellness: 'health',
-    clothes: 'shopping', gift: 'shopping', gifts: 'shopping', home: 'shopping',
+    clothes: 'shopping', home: 'shopping',
+    holiday: 'travel', holidays: 'travel', trip: 'travel', trips: 'travel', vacation: 'travel', flights: 'travel', hotels: 'travel',
+    gift: 'gifts', present: 'gifts', presents: 'gifts', donations: 'gifts', charity: 'gifts',
+    parents: 'family', kids: 'family', children: 'family', childcare: 'family',
     taxi: 'transport', auto: 'transport', car: 'transport', fuel: 'transport', commute: 'transport', transportation: 'transport',
     supermarket: 'groceries', household: 'groceries',
-    misc: 'other', uncategorized: 'other', uncategorised: 'other', charity: 'other', pets: 'other',
+    misc: 'other', uncategorized: 'other', uncategorised: 'other', pets: 'other',
   };
 
   // Display currency: [symbol, decimals shown]. Amounts are always stored in hundredths.
@@ -1229,7 +1295,7 @@
     shopping: `shopping shop uniqlo zara h&m cottonon muji daiso ikea courts harveynorman bestdenki challenger
       gaincity samsung sony lazada shopee amazon taobao qoo10 zalora temu shein aliexpress kinokuniya decathlon
       lovebonito charles&keith m&s pedro bata nike adidas puma clothes clothing shirt shirts tshirt pants jeans
-      dress shoes sneakers bag wallet jewellery jewelry gift gifts present toys toy lego electronics gadget
+      dress shoes sneakers bag wallet jewellery jewelry toys toy lego electronics gadget
       laptop charger cable headphones earphones powerbank furniture homeware decor chair sofa table mattress
       pillow bedsheet stationery books book magazine`,
     health: `health clinic gp polyclinic hospital specialist a&e medical dental dentist orthodontist braces physio
@@ -1241,11 +1307,16 @@
     leisure: `leisure movie movies cinema film gv shaw cathay concert gig show theatre theater musical museum
       gallery exhibition zoo aquarium sentosa uss bowling karaoke ktv teoheng bar pub club clubbing beer beers
       heineken carlsberg guinness wine cocktail cocktails whisky soju games game gaming steam playstation psn
-      nintendo xbox travel trip hotel hostel airbnb resort holiday vacation staycation flight flights airline
-      airfare scoot jetstar airasia klook agoda expedia tour tours tickets ticket golf climbing bouldering arcade
+      nintendo xbox staycation klook tickets ticket golf climbing bouldering arcade
       timezone hobby hobbies camping diving ski festival party`,
-    other: `other others misc miscellaneous angbao angpao angpow hongbao redpacket donation donations charity
-      zakat church tithe offering temple pet pets vet petfood laundry drycleaning postage singpost courier
+    travel: `travel trip trips hotel hotels hostel airbnb resort holiday holidays vacation flight flights airline
+      airfare airport scoot jetstar airasia sia changi agoda expedia tour tours passport luggage
+      suitcase overseas abroad`,
+    family: `family parents parent mum mom mummy mommy mother dad daddy father grandma grandpa grandparents ahma
+      ahgong popo gonggong inlaws allowance`,
+    gifts: `gift gifts present presents angbao angpao angpow hongbao redpacket flowers florist bouquet hamper
+      donation donations charity zakat tithe offering`,
+    other: `other others misc miscellaneous church temple pet pets vet petfood laundry drycleaning postage singpost courier
       ninjavan printing photocopy fine fines penalty summons`,
   };
   // Names longer than one word. They are checked before single words, so "grab food" wins over "grab".
@@ -1269,13 +1340,16 @@
       ntuc income|pacific light|tuas power|keppel electric|helper salary|maid levy|aircon servicing|
       house cleaning`,
     shopping: `charles & keith|love bonito|cotton on|harvey norman|best denki|gain city|apple store|
-      gift card|tiktok shop|new balance|h & m|marks & spencer|phone case|new phone|phone repair|power bank|
+      tiktok shop|new balance|h & m|marks & spencer|phone case|new phone|phone repair|power bank|
       water bottle|school supplies`,
     health: `a & e|eye check|eye test|contact lenses|contact lens|hair cut|gym membership|health screening|
       thai massage|foot massage|dental cleaning|medical check`,
-    leisure: `golden village|universal studios|bird park|river wonders|night safari|escape room|trip com|
-      booking com|gardens by the bay|theme park|water park|teo heng|cable car`,
-    other: `ang bao|ang pao|ang pow|red packet|hong bao|pet food|dry cleaning`,
+    leisure: `golden village|universal studios|bird park|river wonders|night safari|escape room|
+      gardens by the bay|theme park|water park|teo heng|cable car`,
+    travel: `trip com|booking com|singapore airlines|travel insurance|airport transfer|hotel booking`,
+    family: `parents allowance|allowance for parents|pocket money|family support|in laws`,
+    gifts: `gift card|birthday gift|birthday present|wedding gift|ang bao|ang pao|ang pow|red packet|hong bao`,
+    other: `pet food|dry cleaning`,
   };
   // Shops that sell everything, and words that only hint. A more specific word in the same description wins.
   const WEAK = new Set(
@@ -1915,7 +1989,58 @@
   function sanitizeSettings(raw) {
     const s = raw && typeof raw === 'object' ? raw : {};
     const posInt = (v) => (Number.isSafeInteger(v) && v > 0 ? v : null);
-    return { budget: posInt(s.budget), income: posInt(s.income) };
+    return { budget: posInt(s.budget), income: posInt(s.income), limits: sanitizeLimits(s.limits) };
+  }
+
+  // Optional monthly caps for single everyday categories, in hundredths: { food: 40000 }.
+  const LIMIT_CATS = CATEGORIES.map(([id]) => id).filter((id) => id !== 'bills');
+  function sanitizeLimits(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const id of LIMIT_CATS) if (Number.isSafeInteger(raw[id]) && raw[id] > 0) out[id] = raw[id];
+    return out;
+  }
+  const hasLimits = (l) => Boolean(l) && Object.keys(l).length > 0;
+
+  // Each capped category in one month: spent so far, the cap, and how that compares with the days gone.
+  function limitRows(entries, limits, view, today) {
+    const key = monthKey(view);
+    const todayKey = monthKey({ y: today.getFullYear(), m: today.getMonth() + 1 });
+    const dim = daysInMonth(view.y, view.m);
+    const d = key === todayKey ? today.getDate() : key < todayKey ? dim : 0;
+    const spent = new Map();
+    for (const e of entries) if (e.date.slice(0, 7) === key && isFlex(e)) spent.set(e.cat, (spent.get(e.cat) || 0) + e.cents);
+    return LIMIT_CATS.filter((c) => limits && limits[c] > 0).map((cat) => {
+      const limit = limits[cat];
+      const cents = spent.get(cat) || 0;
+      const used = cents / limit;
+      const expected = d / dim;
+      let level = 'good';
+      if (cents > limit) level = 'alert';
+      else if (used >= 0.9 || (d < dim && used > expected + 0.15)) level = 'watch';
+      return { cat, limit, cents, used, left: limit - cents, level, daysLeft: dim - d };
+    });
+  }
+
+  // Everyday and bills per month for the n months ending at `end`, oldest first.
+  function monthTrend(entries, end, n = 6) {
+    const months = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const v = shiftMonth(end, -i);
+      months.push({ y: v.y, m: v.m, key: monthKey(v), flex: 0, bills: 0, count: 0 });
+    }
+    const at = new Map(months.map((x) => [x.key, x]));
+    for (const e of entries) {
+      const row = at.get(e.date.slice(0, 7));
+      if (!row) continue;
+      if (isFlex(e)) row.flex += e.cents;
+      else row.bills += e.cents;
+      row.count += 1;
+    }
+    // The average leaves out the month in progress and months with nothing logged.
+    const done = months.slice(0, -1).filter((x) => x.count > 0);
+    const avgFlex = done.length ? Math.round(done.reduce((s, x) => s + x.flex, 0) / done.length) : null;
+    return { months, avgFlex, avgOver: done.length };
   }
 
   // "a", "a and b", "a, b and c"
@@ -1989,7 +2114,12 @@
       expenses.push(remap.has(e.billId) ? { ...e, billId: remap.get(e.billId) } : e);
     }
     const pick = (mine, theirs) => (fresh ? (theirs != null ? theirs : mine) : mine != null ? mine : theirs);
-    const settings = { budget: pick(cur.settings.budget, backup.settings.budget), income: pick(cur.settings.income, backup.settings.income) };
+    const someLimits = (l) => (hasLimits(l) ? l : null);
+    const settings = {
+      budget: pick(cur.settings.budget, backup.settings.budget),
+      income: pick(cur.settings.income, backup.settings.income),
+      limits: pick(someLimits(cur.settings.limits), someLimits(backup.settings.limits)) || {},
+    };
     return {
       fresh,
       expenses: [...base.expenses, ...expenses],
@@ -1998,6 +2128,7 @@
       currency: fresh && backup.currency ? backup.currency : cur.currency,
       added: { entries: expenses.length, bills: bills.length },
       filled: ['budget', 'income'].filter((k) => settings[k] !== cur.settings[k]),
+      limitsFilled: settings.limits !== cur.settings.limits && hasLimits(settings.limits),
       already,
       otherCurrency: !fresh && backup.currency && backup.currency !== cur.currency ? backup.currency : null,
     };
@@ -2006,6 +2137,7 @@
   const EX = {
     budget: 120000,
     income: 420000,
+    limits: { food: 35000, shopping: 10000 },
     // Everyday spending on a 7-day cycle (day of month % 7). Amounts: [this month, last month].
     pattern: [
       [['Kopi', 'food', 1.8, 1.8], ['Lunch at hawker centre', 'food', 6.5, 6], ['MRT', 'transport', 2.1, 2.1]],
@@ -2088,11 +2220,11 @@
     'ringToday', 'ringMonth', 'ringSaving', 'ringTick', 'ringDetail',
     'focusDot', 'focusText', 'focusAction', 'contribMeta', 'contribs', 'contribMore', 'addBill', 'billsSummary', 'billsList',
     'prevMonth', 'nextMonth', 'thisMonth', 'monthLabel', 'chartTotal', 'chartNote', 'legPace', 'legFc', 'chart',
-    'catMeta', 'scopeFlex', 'scopeAll', 'donutWrap', 'breakdown', 'entryCount', 'filterChip', 'search', 'exampleNote', 'clearExamples', 'ledger', 'ledgerHint', 'storageNote',
+    'catMeta', 'scopeFlex', 'scopeAll', 'donutWrap', 'breakdown', 'trend', 'trendMeta', 'trendLegAvg', 'entryCount', 'filterChip', 'search', 'searchAll', 'exampleNote', 'clearExamples', 'ledger', 'ledgerHint', 'storageNote',
     'sheet', 'sheetTitle',
     'entryForm', 'eAmountBox', 'eAmount', 'eAmountError', 'eNote', 'eCats', 'eDate', 'eDateError', 'eBillNote', 'eDelete',
     'billForm', 'bName', 'bNameError', 'bAmountBox', 'bAmount', 'bAmountError', 'bDay', 'bDayError', 'bMonthWrap', 'bMonth', 'bDelete',
-    'settingsForm', 'sBudgetBox', 'sBudget', 'sBudgetError', 'sIncomeBox', 'sIncome', 'sIncomeError', 'sCurrency', 'sBackup', 'sExport', 'sImport', 'sPaste', 'sClear', 'sStorage', 'sVersion', 'sSyncWrap', 'sSync', 'sSyncStatus',
+    'settingsForm', 'sBudgetBox', 'sBudget', 'sBudgetError', 'sLimitsBox', 'sLimitsMeta', 'sLimits', 'sLimitsError', 'sIncomeBox', 'sIncome', 'sIncomeError', 'sCurrency', 'sBackup', 'sExport', 'sImport', 'sPaste', 'sClear', 'sStorage', 'sVersion', 'sSyncWrap', 'sSync', 'sSyncStatus',
     'pasteForm', 'pLabel', 'pText', 'pHint', 'pError', 'pImport', 'pSelect',
     'syncForm', 'gSetup', 'gScriptUrl', 'gUrl', 'gError', 'gConnect', 'gCopy', 'gLinked', 'gStatus', 'gNow', 'gOpen', 'gRestore', 'gOff',
     'toast', 'toastMsg', 'toastAction',
@@ -2109,8 +2241,9 @@
     expenses: [],
     bills: [],
     examples: false,
-    settings: { budget: null, income: null },
+    settings: { budget: null, income: null, limits: {} },
     currency: 'SGD',
+    searchAll: false,
     view: { y: now.getFullYear(), m: now.getMonth() + 1 },
     filter: null,
     catScope: 'everyday',
@@ -2156,6 +2289,7 @@
   const decimals = () => (CURRENCIES[state.currency] || CURRENCIES.SGD)[1];
   const effBudget = () => (state.settings.budget != null ? state.settings.budget : state.examples ? EX.budget : null);
   const effIncome = () => (state.settings.income != null ? state.settings.income : state.examples ? EX.income : null);
+  const effLimits = () => (hasLimits(state.settings.limits) ? state.settings.limits : state.examples ? EX.limits : {});
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const monthDate = ({ y, m }) => new Date(y, m - 1, 1);
   const monthLong = (v) => monthDate(v).toLocaleDateString('en-GB', { month: 'long' });
@@ -2397,10 +2531,36 @@
   }
 
   let focusRun = null;
+  // The category limit most worth a word today: one already over, else one running well ahead.
+  function limitFocus() {
+    const t = parseISO(state.today);
+    const rows = limitRows(state.expenses, effLimits(), { y: t.getFullYear(), m: t.getMonth() + 1 }, t);
+    const over = rows.filter((r) => r.level === 'alert').sort((a, b) => a.left - b.left)[0];
+    if (over) {
+      return { level: 'alert', text: `${CAT_LABEL[over.cat]} is ${whole(-over.left)} over its ${whole(over.limit)} limit this month. Anything more there adds to the overspend.`, action: { label: 'See entries', run: () => showCategory(over.cat) } };
+    }
+    const close = rows.filter((r) => r.level === 'watch').sort((a, b) => b.used - a.used)[0];
+    if (close) {
+      const days = close.daysLeft > 0 ? ` with ${plural(close.daysLeft, 'day', 'days')} to go` : '';
+      return { level: 'watch', text: `${CAT_LABEL[close.cat]} has used ${formatPct(close.used)} of its ${whole(close.limit)} limit${days}. ${whole(close.left)} is left for the rest of the month.`, action: { label: 'See entries', run: () => showCategory(close.cat) } };
+    }
+    return null;
+  }
+
+  function showCategory(cat) {
+    const t = parseISO(state.today);
+    state.view = { y: t.getFullYear(), m: t.getMonth() + 1 };
+    state.filter = cat;
+    render();
+    els.breakdown.scrollIntoView({ behavior: smooth(), block: 'center' });
+  }
+
   function pickFocus(ds) {
     const overdue = ds.billRows.filter((x) => x.status === 'overdue');
     const dueSoon = ds.billRows.filter((x) => x.status === 'today' || (x.status === 'soon' && x.daysUntil <= 3));
     const pace = paceStatus(ds);
+    const lim = limitFocus();
+    if (!ds.budget && lim) return lim;
     if (!ds.budget) {
       return { level: 'steady', text: 'Set an everyday budget and this becomes a daily allowance, with a pace check and a month-end forecast.', action: { label: 'Set budget', run: () => openSettings('sBudget') } };
     }
@@ -2411,6 +2571,7 @@
     if (ds.leftMonth < 0) {
       return { level: 'alert', text: `Everyday spending is ${whole(ds.leftMonth)} over this month's ${whole(ds.budget)} budget. Holding optional spending until the 1st is the quickest fix. If the budget was unrealistic, adjust it.`, action: { label: 'Adjust budget', run: () => openSettings('sBudget') } };
     }
+    if (lim && lim.level === 'alert') return lim;
     if (ds.leftToday < 0) {
       const tail = ds.tomorrow != null ? ` Tomorrow's allowance adjusts to ${whole(ds.tomorrow)}, so the month still balances.` : '';
       return { level: 'watch', text: `You're ${whole(ds.leftToday)} over today's ${whole(ds.allowance)} allowance.${tail}` };
@@ -2419,6 +2580,7 @@
       const perDay = ds.d < ds.dim ? Math.max(0, ds.leftMonth) / (ds.dim - ds.d) : ds.leftToday;
       return { level: pace.level, text: `Everyday spending is ${whole(ds.flexToDate - ds.expected)} ahead of pace. Keeping to about ${whole(perDay)} a day from tomorrow lands the month on budget.` };
     }
+    if (lim) return lim;
     if (dueSoon.length) {
       const x = dueSoon[0];
       return { level: 'steady', text: `${x.name} (${money(x.cents)}) is due ${x.status === 'today' ? 'today' : `on ${shortDate(x.dueISO)}`}.`, action: { label: 'Mark paid', run: () => markPaid(x.id) } };
@@ -2556,7 +2718,44 @@
     els.legFc.hidden = !rv.isCurrent;
     renderChart();
     renderBreakdown();
+    renderTrend();
     renderLedger();
+  }
+
+  // Six months to the current one. Tapping a month opens it in the review above.
+  function renderTrend() {
+    const t = parseISO(state.today);
+    const tr = monthTrend(state.expenses, { y: t.getFullYear(), m: t.getMonth() + 1 }, 6);
+    const top = Math.max(1, ...tr.months.map((x) => x.flex + x.bills));
+    const viewKey = monthKey(state.view);
+    const cols = tr.months.map((x, i) => {
+      const sum = x.flex + x.bills;
+      const current = i === tr.months.length - 1;
+      const name = current ? `${monthLong(x)} so far` : monthYear(x);
+      const aria = sum
+        ? `${name}: ${money(x.flex)} everyday${x.bills ? ` and ${money(x.bills)} bills` : ''}. Open this month`
+        : `${name}: nothing logged. Open this month`;
+      return h(
+        'button',
+        { type: 'button', class: 'trend-col', data: { y: String(x.y), m: String(x.m) }, 'aria-current': String(x.key === viewKey), 'aria-label': aria },
+        h(
+          'span',
+          { class: 'trend-plot', 'aria-hidden': 'true' },
+          h(
+            'span',
+            { class: 'trend-stack', style: `--h: ${((sum / top) * 100).toFixed(2)}%; --f: ${sum ? ((x.flex / sum) * 100).toFixed(2) : 0}%; --b: ${sum ? ((x.bills / sum) * 100).toFixed(2) : 0}%` },
+            h('i', { class: 'f' }),
+            h('i', { class: 'b' })
+          )
+        ),
+        h('span', { class: 'trend-lab', 'aria-hidden': 'true' }, h('span', { class: 'trend-mon' }, monthShort(x)), h('span', { class: 'trend-amt' }, sum ? `${sym()}${compactWhole(sum)}` : '–'))
+      );
+    });
+    if (tr.avgFlex) cols.push(h('span', { class: 'trend-avg', style: `--a: ${(tr.avgFlex / top).toFixed(4)}`, 'aria-hidden': 'true' }));
+    els.trend.replaceChildren(...cols);
+    els.trendLegAvg.hidden = !tr.avgFlex;
+    els.trendMeta.textContent = tr.avgFlex ? `Everyday avg ${whole(tr.avgFlex)}` : '';
+    els.trendMeta.title = tr.avgFlex ? `Average everyday spending over the last ${plural(tr.avgOver, 'full month', 'full months')} with entries` : '';
   }
 
   function niceCeil(v) {
@@ -2657,7 +2856,7 @@
 
   // Category colours: the validated reference palette (dark steps), fixed per category so a colour always
   // means the same thing. Grey is for Other.
-  const CAT_COLOR = { food: '#d95926', groceries: '#008300', transport: '#3987e5', shopping: '#d55181', health: '#199e70', leisure: '#9085e9', other: '#898781', bills: '#c98500' };
+  const CAT_COLOR = { food: '#d95926', groceries: '#008300', transport: '#3987e5', shopping: '#d55181', health: '#199e70', leisure: '#9085e9', travel: '#0094b8', family: '#9a6b3f', gifts: '#d1343b', other: '#898781', bills: '#c98500' };
   const catName = (cat) => CAT_LABEL[cat] || 'Other';
   const shareText = (s) => (s > 0 && s < 0.005 ? '<1%' : `${Math.round(s * 100)}%`);
   // White or near-black, whichever reads better on the fill.
@@ -2670,7 +2869,7 @@
     return 1.05 / (lum + 0.05) >= (lum + 0.05) / 0.0533 ? '#ffffff' : '#0b0b0b';
   }
 
-  function catRow(c, outside) {
+  function catRow(c, outside, lim) {
     const { cat, cents, share, change, before, now, count } = c;
     const label = catName(cat);
     const active = state.filter === cat;
@@ -2683,7 +2882,12 @@
     } else if (change != null) delta = 'Same';
     else if (!outside && before === 0) delta = 'New';
     const entries = plural(count, 'entry', 'entries');
-    const sub = outside ? `${entries}, not in the chart` : `${shareText(share)} · ${entries}`;
+    let sub = outside ? `${entries}, not in the chart` : `${shareText(share)} · ${entries}`;
+    let limText = '';
+    if (lim && !outside) {
+      limText = lim.left < 0 ? `${whole(-lim.left)} over ${whole(lim.limit)} limit` : `${whole(lim.left)} left of ${whole(lim.limit)}`;
+      sub = [count ? `${shareText(share)} · ` : '', h('span', { class: `lv-${lim.level}` }, limText)];
+    }
     const of = state.catScope === 'all' ? 'all spending' : 'everyday spending';
     return h(
       'button',
@@ -2692,12 +2896,16 @@
         class: 'cat-row',
         'aria-pressed': String(active),
         data: { cat },
-        'aria-label': `${label}, ${money(cents)}${outside ? '' : `, ${shareText(share)} of ${of}`}, ${entries}. ${active ? 'Show all entries' : 'Show only these entries'}`,
+        'aria-label': `${label}, ${money(cents)}${outside ? '' : `, ${shareText(share)} of ${of}`}, ${entries}${limText ? `, ${limText}` : ''}. ${active ? 'Show all entries' : 'Show only these entries'}`,
       },
       h('span', { class: 'cat-name' }, outside ? null : h('span', { class: 'cat-swatch', style: `--sw: ${CAT_COLOR[cat]}`, 'aria-hidden': 'true' }), label, h('span', { class: 'cat-sub' }, sub)),
       h('span', { class: 'cat-amt' }, money(cents)),
       h('span', { class: cls }, delta),
-      outside ? null : h('span', { class: 'meter', 'aria-hidden': 'true' }, h('span', { class: 'is-cat', style: `--w: ${(share * 100).toFixed(2)}%; --sw: ${CAT_COLOR[cat]}` }))
+      outside
+        ? null
+        : lim
+          ? h('span', { class: `meter is-limit lv-${lim.level}`, 'aria-hidden': 'true' }, h('span', { style: `--w: ${(Math.min(1, lim.used) * 100).toFixed(2)}%` }))
+          : h('span', { class: 'meter', 'aria-hidden': 'true' }, h('span', { class: 'is-cat', style: `--w: ${(share * 100).toFixed(2)}%; --sw: ${CAT_COLOR[cat]}` }))
     );
   }
 
@@ -2710,7 +2918,16 @@
     els.scopeAll.setAttribute('aria-pressed', String(all));
     els.breakdown.classList.toggle('is-filtered', Boolean(state.filter));
     renderDonut(sum);
-    const items = sum.rows.map((c) => h('li', null, catRow(c, false)));
+    const t = parseISO(state.today);
+    const limits = rv.isFuture ? [] : limitRows(state.expenses, effLimits(), state.view, t);
+    const limOf = new Map(limits.map((r) => [r.cat, r]));
+    const items = sum.rows.map((c) => h('li', null, catRow(c, false, limOf.get(c.cat))));
+    // A capped category with nothing spent yet still shows, so the whole limit is visible as left.
+    const shown = new Set(sum.rows.map((r) => r.cat));
+    for (const r of limits) {
+      if (shown.has(r.cat)) continue;
+      items.push(h('li', null, catRow({ cat: r.cat, cents: 0, share: 0, change: null, before: 1, now: 0, count: 0 }, false, r)));
+    }
     if (!items.length) items.push(h('li', { class: 'cat-empty' }, all ? `Nothing spent in ${monthLong(state.view)}.` : `No everyday spending in ${monthLong(state.view)}.`));
     if (!all && rv.bills.cents) items.push(h('li', { class: 'bills-line' }, catRow(rv.bills, true)));
     els.breakdown.replaceChildren(...items);
@@ -2801,7 +3018,10 @@
     const rv = state.review;
     const month = monthLong(state.view);
     const q = normalize(state.search);
-    let rows = rv.inMonth;
+    const all = state.searchAll;
+    let rows = all ? state.expenses : rv.inMonth;
+    els.searchAll.setAttribute('aria-pressed', String(all));
+    els.search.placeholder = all ? 'Search every month' : `Search ${month}`;
     if (state.filter) rows = rows.filter((e) => e.cat === state.filter);
     if (q) rows = rows.filter((e) => normalize(e.note).includes(q) || normalize(CAT_LABEL[e.cat]).includes(q));
     els.entryCount.textContent = rows.length ? String(rows.length) : '';
@@ -2816,7 +3036,8 @@
 
     if (!rows.length) {
       const what = state.filter ? `${CAT_LABEL[state.filter]} entries` : 'entries';
-      const title = q ? `No ${what} match "${state.search.trim()}"` : state.filter ? `No ${what} in ${month}` : `Nothing logged in ${month} yet`;
+      const where = all ? 'any month' : month;
+      const title = q ? `No ${what} match "${state.search.trim()}"` : state.filter ? `No ${what} in ${where}` : all ? 'Nothing logged yet' : `Nothing logged in ${month} yet`;
       const body = q || state.filter
         ? h('button', { type: 'button', class: 'link-btn', 'data-action': 'clear-filter' }, 'Show all entries')
         : rv.isFuture ? 'This month has not started.' : 'Log one at the top of the page. It is saved in this browser straight away.';
@@ -2834,7 +3055,7 @@
     const frag = document.createDocumentFragment();
     const yesterday = isoDate(addDays(parseISO(state.today), -1));
     for (const g of groups) {
-      const text = weekdayDate(g.date);
+      const text = g.date.slice(0, 4) === state.today.slice(0, 4) ? weekdayDate(g.date) : `${weekdayDate(g.date)} ${g.date.slice(0, 4)}`;
       const label = g.date === state.today ? `Today · ${text}` : g.date === yesterday ? `Yesterday · ${text}` : text;
       frag.append(
         h(
@@ -2845,7 +3066,7 @@
         )
       );
     }
-    const shownLabel = state.filter ? `${state.filter === 'bills' ? 'Bills' : CAT_LABEL[state.filter]} total` : q ? 'Matching total' : `${month} total`;
+    const shownLabel = state.filter ? `${state.filter === 'bills' ? 'Bills' : CAT_LABEL[state.filter]} total${all ? ', all months' : ''}` : q ? 'Matching total' : all ? 'Total, all months' : `${month} total`;
     frag.append(h('div', { class: 'footing' }, h('span', { class: 'footing-label' }, shownLabel), h('span', { class: 'footing-amt' }, money(total(rows)))));
     els.ledger.replaceChildren(frag);
   }
@@ -3298,10 +3519,34 @@
     els.sBudget.placeholder = state.examples && state.settings.budget == null ? `${plain(EX.budget)} in the examples` : 'e.g. 1,200';
     els.sIncome.placeholder = state.examples && state.settings.income == null ? `${plain(EX.income)} in the examples` : 'After tax and CPF';
     els.sCurrency.value = state.currency;
+    renderLimitFields();
     disarmClear();
     els.sStorage.textContent = storageText();
     openSheet(els.settingsForm, 'Budget and settings', focusId ? $(focusId) : null);
   }
+  function renderLimitFields() {
+    const lim = state.settings.limits || {};
+    const ex = !hasLimits(lim) && state.examples ? EX.limits : {};
+    els.sLimits.replaceChildren(
+      ...LIMIT_CATS.map((cat) =>
+        h(
+          'label',
+          { class: 'limit-field' },
+          h('span', { class: 'limit-name' }, h('span', { class: 'cat-swatch', style: `--sw: ${CAT_COLOR[cat]}`, 'aria-hidden': 'true' }), CAT_LABEL[cat]),
+          h(
+            'span',
+            { class: 'amount amount-sm' },
+            h('span', { class: 'amount-prefix', 'data-sym': '', 'aria-hidden': 'true' }, sym()),
+            h('input', { type: 'text', inputmode: 'decimal', 'data-limit': cat, value: lim[cat] ? amountForInput(lim[cat]) : '', placeholder: ex[cat] ? plain(ex[cat]) : 'No limit', 'aria-label': `${CAT_LABEL[cat]} limit per month` })
+          )
+        )
+      )
+    );
+    const n = Object.keys(lim).length;
+    els.sLimitsMeta.textContent = n ? plural(n, 'limit', 'limits') : 'None set';
+    els.sLimitsBox.open = n > 0;
+  }
+
   function onSettingsSubmit(ev) {
     ev.preventDefault();
     clearErrors(els.settingsForm);
@@ -3313,9 +3558,19 @@
     const income = iRaw ? parseAmount(iRaw, dec) : null;
     if (bRaw && budget == null) fieldError(els.sBudget, els.sBudgetBox, els.sBudgetError, 'Enter an amount above 0, or leave it blank.');
     if (iRaw && income == null) fieldError(els.sIncome, els.sIncomeBox, els.sIncomeError, 'Enter an amount above 0, or leave it blank.');
+    const limits = {};
+    for (const input of els.sLimits.querySelectorAll('input[data-limit]')) {
+      const raw = input.value.trim();
+      if (!raw) continue;
+      const cents = parseAmount(raw, dec);
+      if (cents == null) {
+        els.sLimitsBox.open = true;
+        fieldError(input, input.parentElement, els.sLimitsError, 'Each limit needs an amount above 0, or leave the box blank.');
+      } else limits[input.dataset.limit] = cents;
+    }
     const bad = firstInvalid(els.settingsForm);
     if (bad) return bad.focus();
-    state.settings = { budget, income };
+    state.settings = { budget, income, limits };
     state.currency = code;
     const saved = persistSettings();
     closeSheet();
@@ -3360,7 +3615,7 @@
     const parts = [];
     if (state.expenses.length) parts.push(plural(state.expenses.length, 'entry', 'entries'));
     if (state.bills.length) parts.push(plural(state.bills.length, 'bill', 'bills'));
-    if (state.settings.budget != null || state.settings.income != null) parts.push('your budget');
+    if (state.settings.budget != null || state.settings.income != null || hasLimits(state.settings.limits)) parts.push('your budget');
     return parts.length ? `Delete ${joinAnd(parts)}?` : 'Delete everything?';
   }
   function clearExamples() {
@@ -3459,7 +3714,7 @@
     const parsed = parseBackup(text);
     if (parsed.error) return parsed.error;
     const b = parsed.backup;
-    if (!b.expenses.length && !b.bills.length && b.settings.budget == null && b.settings.income == null) return 'That backup has nothing in it.';
+    if (!b.expenses.length && !b.bills.length && b.settings.budget == null && b.settings.income == null && !hasLimits(b.settings.limits)) return 'That backup has nothing in it.';
     const before = snapshot();
     const plan = planRestore(state, b);
     state.examples = false;
@@ -3480,6 +3735,7 @@
     if (plan.filled.length === 2) parts.push('your budget and take-home pay');
     else if (plan.filled[0] === 'budget') parts.push('your budget');
     else if (plan.filled[0] === 'income') parts.push('your take-home pay');
+    if (plan.limitsFilled) parts.push('your category limits');
     let msg = parts.length ? `Restored ${joinAnd(parts)}.` : 'Nothing new to restore.';
     if (plan.already) msg += ` ${plural(plan.already, 'entry was', 'entries were')} already here.`;
     if (b.unreadable > 0) msg += ` ${plural(b.unreadable, 'entry', 'entries')} couldn't be read.`;
@@ -3848,6 +4104,17 @@
   els.filterChip.addEventListener('click', () => {
     state.filter = null;
     renderReview();
+  });
+  els.searchAll.addEventListener('click', () => {
+    state.searchAll = !state.searchAll;
+    renderLedger();
+  });
+  els.trend.addEventListener('click', (ev) => {
+    const col = ev.target.closest('.trend-col');
+    if (!col) return;
+    state.view = { y: Number(col.dataset.y), m: Number(col.dataset.m) };
+    render();
+    els.monthLabel.scrollIntoView({ behavior: smooth(), block: 'start' });
   });
   els.search.addEventListener('input', () => {
     state.search = els.search.value;
@@ -4342,6 +4609,9 @@ var CATS = [
   ['shopping', 'Shopping', '#d55181'],
   ['health', 'Health & care', '#199e70'],
   ['leisure', 'Leisure', '#9085e9'],
+  ['travel', 'Travel', '#0094b8'],
+  ['family', 'Family', '#9a6b3f'],
+  ['gifts', 'Gifts', '#d1343b'],
   ['other', 'Other', '#898781'],
   ['bills', 'Bills', '#c98500'],
 ];

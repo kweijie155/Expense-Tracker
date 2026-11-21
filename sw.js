@@ -1,5 +1,5 @@
 // Pocket Ledger offline support. Your entries live in this phone's storage, never in this file or online.
-const VERSION = 'pocket-ledger-f7f0e2f683';
+const VERSION = 'pocket-ledger-limits-2026-11-21';
 const SHELL = ["./", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "google-sheets-script.txt", "fonts/manrope-vietnamese-wght-normal.woff2", "fonts/manrope-latin-ext-wght-normal.woff2", "fonts/manrope-latin-wght-normal.woff2"];
 
 self.addEventListener('install', (event) => {
